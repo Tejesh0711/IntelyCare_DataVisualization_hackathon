@@ -13,6 +13,26 @@
 </head>
 <body>
 <style>
+    .filter-ctrl {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        z-index: 1;
+        width: 180px;
+    }
+
+    .filter-ctrl input[type=text] {
+        font: 12px/20px 'Helvetica Neue', Arial, Helvetica, sans-serif;
+        width: 100%;
+        border: 0;
+        background-color: #fff;
+        height: 40px;
+        margin: 0;
+        color: rgba(0,0,0,.5);
+        padding: 10px;
+        box-shadow: 0 0 0 2px rgba(0,0,0,0.1);
+        border-radius: 3px;
+    }
     #menu {
         background: #fff;
         position: absolute;
@@ -54,12 +74,81 @@
     #menu a.active:hover {
         background: #3074a4;
     }
+    #map {
+        position:absolute;
+        left:25%;
+        top:0;
+        bottom:0;
+        width: 75%;
+    }
+    .map-overlay {
+        position: absolute;
+        width: 25%;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        font: 12px/20px 'Helvetica Neue', Arial, Helvetica, sans-serif;
+        background-color: #fff;
+        max-height: 100%;
+        overflow: hidden;
+    }
+
+    .map-overlay fieldset {
+        display: none;
+        background: #ddd;
+        border: none;
+        padding: 10px;
+        margin: 0;
+    }
+
+    .map-overlay input {
+        display: block;
+        border: none;
+        width: 100%;
+        border-radius: 3px;
+        padding: 10px;
+        margin: 0;
+    }
+
+    .map-overlay .listing {
+        overflow: auto;
+        max-height: 100%;
+    }
+
+    .map-overlay .listing > * {
+        display: block;
+        padding: 5px 10px;
+        margin: 0;
+    }
+
+    .map-overlay .listing a {
+        border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+        color: #404;
+        text-decoration: none;
+    }
+
+    .map-overlay .listing a:last-child {
+        border: none;
+    }
+
+    .map-overlay .listing a:hover {
+        background: #f0f0f0;
+    }
 </style>
 
 <nav id="menu"></nav>
 <div id="map"></div>
+<div class='map-overlay'>
+    <fieldset>
+        <input id='feature-filter' type='text' placeholder='Filter results by name' />
+    </fieldset>
+    <div id='feature-listing' class='listing'></div>
+</div>
 
 <script>
+
+var layerIDs = []; // Will contain a list used to filter against.
+
 mapboxgl.accessToken = 'pk.eyJ1Ijoiam9zaGJyb29rbGluZSIsImEiOiJjajkwcXc2YW0wZmN3MnFwNmN0NjNxeXZiIn0.875EMYRoFYVLVHcPIaAIzg';
 var map = new mapboxgl.Map({
     container: 'map',
@@ -69,16 +158,45 @@ var map = new mapboxgl.Map({
     zoom: 1,
     center: [42.1250929,-72.749538]
 });
-//Provider layer Tileset URL Information
-map.on('load', function () {
-    map.addSource('provider', {
-        type: 'vector',
-        url: 'mapbox://joshbrookline.cj9106ppc32j72xqzswddu9rz-1pb5v'
+
+var filterEl = document.getElementById('feature-filter');
+var listingEl = document.getElementById('feature-listing');
+
+filterEl.parentNode.style.display = 'block';
+
+function normalize(string) {
+    return string.trim().toLowerCase();
+}
+
+function getUniqueFeatures(array, comparatorProperty) {
+    var existingFeatureKeys = {};
+    // Because features come from tiled vector data, feature geometries may be split
+    // or duplicated across tile boundaries and, as a result, features may appear
+    // multiple times in query results.
+    var uniqueFeatures = array.filter(function(el) {
+        if (existingFeatureKeys[el.properties[comparatorProperty]]) {
+            return false;
+        } else {
+            existingFeatureKeys[el.properties[comparatorProperty]] = true;
+            return true;
+        }
     });
+
+    return uniqueFeatures;
+}
+
+// START OF OUR CODE
+
+map.on('load', function () {
+
+//Provider layer Tileset URL Information
     map.addLayer({
         'id': 'provider',
         'type': 'circle',
-        'source': 'provider',
+        'source': {
+            type: 'vector',
+            url: 'mapbox://joshbrookline.cj9106ppc32j72xqzswddu9rz-1pb5v'
+        },
         'layout': {
             'visibility': 'visible'
         },
@@ -89,31 +207,29 @@ map.on('load', function () {
         'source-layer': 'provider'
     });
 //Client Tilset URL information
-    map.addSource('client', {
-        type: 'vector',
-        url: 'mapbox://joshbrookline.cj9108ngv33gr2xn5lrz7rzrr-9at7b'
-    });
     map.addLayer({
         'id': 'client',
         'type': 'circle',
-        'source': 'client',
+        'source': {
+            type: 'vector',
+            url: 'mapbox://joshbrookline.cj9108ngv33gr2xn5lrz7rzrr-9at7b'
+        },
         'source-layer': 'client',
         'layout': {
             'visibility': 'visible'
         },
         'paint': {
             'circle-radius': 8,
-            'circle-color': 'rgba(146,148,179,1)'
+            'circle-color': 'rgba(255,148,179,1)'
         },
         });
-    map.addSource('paths', {
-        type: 'vector',
-        url: 'mapbox://joshbrookline.cj91f8nie38ql33o4co685x23-3f6qr'
-    });
     map.addLayer({
-        'id': 'paths',
+        'id': 'path',
         'type': 'line',
-        'source': 'paths',
+        'source': {
+            type: 'vector',
+            url: 'mapbox://joshbrookline.cj91f8nie38ql33o4co685x23-3f6qr'
+        },
         'source-layer': 'shiftPaths',
         'layout': {
             'visibility': 'visible',
@@ -126,9 +242,131 @@ map.on('load', function () {
             'line-opacity': 0.02
         }
     });
+
+    map.on('moveend', function() {
+        // Clear the input container
+        filterEl.value = '';
+
+        var features = map.queryRenderedFeatures({layers:['provider']});
+
+        if (features) {
+            var uniqueFeatures = getUniqueFeatures(features, "id");
+
+            // Store the current features in sn `airports` variable to
+            // later use for filtering on `keyup`.
+            provider = uniqueFeatures;
+            map.setFilter('provider', null);
+        }
+
+        var features = map.queryRenderedFeatures({layers:['client']});
+
+        if (features) {
+            var uniqueFeatures = getUniqueFeatures(features, "id");
+
+            // Store the current features in sn `airports` variable to
+            // later use for filtering on `keyup`.
+            client = uniqueFeatures;
+            map.setFilter('client', null);
+        }
+
+        var features = map.queryRenderedFeatures({layers:['path']});
+
+        if (features) {
+            var uniqueFeatures = getUniqueFeatures(features, "id");
+
+            // Store the current features in sn `airports` variable to
+            // later use for filtering on `keyup`.
+            path = uniqueFeatures;
+            map.setFilter('path', null);
+        }
+    });
+
+    filterEl.addEventListener('keyup', function(e) {
+        var value = normalize(e.target.value);
+
+
+        // Filter visible features that don't match the input value.
+        var filtered = provider.filter(function(feature) {
+            var fname = normalize(feature.properties.fname);
+            var lname = normalize(feature.properties.lname);
+
+            return fname.indexOf(value) > -1 || lname.indexOf(value) > -1;
+        });
+
+
+        // Set the filter to populate features into the layer.
+        map.setFilter('provider', ['in', 'fname'].concat(filtered.map(function(feature) {
+            return feature.properties.fname;
+        })));
+
+        // Filter visible features that don't match the input value.
+        var filtered = client.filter(function(feature) {
+            var fname = normalize(feature.properties.fname);
+            var lname = normalize(feature.properties.lname);
+
+            return fname.indexOf(value) > -1 || lname.indexOf(value) > -1;
+        });
+
+        // Set the filter to populate features into the layer.
+        map.setFilter('client', ['in', 'fname'].concat(filtered.map(function(feature) {
+            return feature.properties.fname;
+        })));
+
+        // Filter visible features that don't match the input value.
+        var filtered = path.filter(function(feature) {
+            var fname = normalize(feature.properties.client_fname);
+            var lname = normalize(feature.properties.client_lname);
+
+            return fname.indexOf(value) > -1 || lname.indexOf(value) > -1;
+        });
+
+        // Set the filter to populate features into the layer.
+        map.setFilter('path', ['in', 'client_fname'].concat(filtered.map(function(feature) {
+            return feature.properties.fname;
+        })));
+    });
+
+    // // Add a GeoJSON source containing place coordinates and information.
+    // map.addSource('places', {
+    //     "type": "geojson",
+    //     "data": places
+    // });
+
+    // places.features.forEach(function(feature) {
+    //     var symbol = feature.properties['icon'];
+    //     var layerID = 'poi-' + symbol;
+
+    //     // Add a layer for this symbol type if it hasn't been added already.
+    //     if (!map.getLayer(layerID)) {
+    //         map.addLayer({
+    //             "id": layerID,
+    //             "type": "symbol",
+    //             "source": "places",
+    //             "layout": {
+    //                 "icon-image": symbol + "-15",
+    //                 "icon-allow-overlap": true,
+    //                 "text-field": symbol,
+    //                 "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
+    //                 "text-size": 11,
+    //                 "text-transform": "uppercase",
+    //                 "text-letter-spacing": 0.05,
+    //                 "text-offset": [0, 1.5]
+    //             },
+    //             "paint": {
+    //                 "text-color": "#202",
+    //                 "text-halo-color": "#fff",
+    //                 "text-halo-width": 2
+    //             },
+    //             "filter": ["==", "icon", symbol]
+    //         });
+
+    //         layerIDs.push(layerID);
+    //     }
+    // });
 });
+
 //Toggle Layers Variables
-var toggleableLayerIds = [ 'client', 'provider', 'paths' ];
+var toggleableLayerIds = [ 'client', 'provider', 'path' ];
 
 for (var i = 0; i < toggleableLayerIds.length; i++) {
     var id = toggleableLayerIds[i];
@@ -171,7 +409,7 @@ var popup = new mapboxgl.Popup({
         // based on the feature found.
         console.log(e.features[0])
         popup.setLngLat(e.features[0].geometry.coordinates)
-            .setHTML(e.features[0].properties.fname)
+            .setHTML(e.features[0].properties.hovertext)
             .addTo(map);
     });
 
@@ -190,7 +428,7 @@ var popup = new mapboxgl.Popup({
         // based on the feature found.
         console.log(e.features[0])
         popup.setLngLat(e.features[0].geometry.coordinates)
-            .setHTML(e.features[0].properties.fname)
+            .setHTML(e.features[0].properties.hovertext)
             .addTo(map);
     });
 
