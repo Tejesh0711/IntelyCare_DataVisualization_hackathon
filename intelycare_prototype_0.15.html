@@ -60,6 +60,7 @@
 <div id="map"></div>
 
 <script>
+//Mapbox Access token
 mapboxgl.accessToken = 'pk.eyJ1Ijoiam9zaGJyb29rbGluZSIsImEiOiJjajkwcXc2YW0wZmN3MnFwNmN0NjNxeXZiIn0.875EMYRoFYVLVHcPIaAIzg';
 var map = new mapboxgl.Map({
     container: 'map',
@@ -163,11 +164,9 @@ var popup = new mapboxgl.Popup({
     });
 
     map.on('mouseenter', 'client', function(e) {
-        // Change the cursor style as a UI indicator.
+        // Duplicate for Client
         map.getCanvas().style.cursor = 'pointer';
-
-        // Populate the popup and set its coordinates
-        // based on the feature found.
+        
         console.log(e.features[0])
         popup.setLngLat(e.features[0].geometry.coordinates)
             .setHTML(e.features[0].properties.fname)
