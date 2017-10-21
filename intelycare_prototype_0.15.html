@@ -106,9 +106,29 @@ map.on('load', function () {
             'circle-color': 'rgba(146,148,179,1)'
         },
         });
+    map.addSource('paths', {
+        type: 'vector',
+        url: 'mapbox://joshbrookline.cj91f8nie38ql33o4co685x23-3f6qr'
+    });
+    map.addLayer({
+        'id': 'paths',
+        'type': 'line',
+        'source': 'paths',
+        'source-layer': 'shiftPaths',
+        'layout': {
+            'visibility': 'visible',
+            'line-join': 'round',
+            'line-cap': 'round'
+        },
+        'paint': {
+            'line-color': '#ff0000',
+            'line-width': 1,
+            'line-opacity': 0.02
+        }
+    });
 });
 //Toggle Layers Variables
-var toggleableLayerIds = [ 'client', 'provider' ];
+var toggleableLayerIds = [ 'client', 'provider', 'paths' ];
 
 for (var i = 0; i < toggleableLayerIds.length; i++) {
     var id = toggleableLayerIds[i];
